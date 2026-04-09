@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Injury Statistics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .chart-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .chart-card h3 {
+            margin-bottom: 15px;
+            color: #555;
+            border-left: 4px solid #4CAF50;
+            padding-left: 12px;
+        }
+        
+        canvas {
+            max-height: 400px;
+            width: 100%;
+        }
+        
+        .stats-box {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .stats-box h3 {
+            margin-bottom: 15px;
+            color: #555;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .stat-item {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 28px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 18px;
+            color: #666;
+        }
+        
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚑 Injury Statistics Dashboard</h1>
+        <div class="subtitle">Data from Google Spreadsheet</div>
+        
+        <div id="loading" class="loading">Loading data from Google Sheets...</div>
+        <div id="error" class="error" style="display:none;"></div>
+        
+        <div id="dashboard" style="display:none;">
+            <div class="stats-box">
+                <h3>📊 Key Statistics</h3>
+                <div class="stats-grid" id="keyStats"></div>
+            </div>
+            
+            <div class="chart-grid">
+                <div class="chart-card">
+                    <h3>Injury Types Distribution</h3>
+                    <canvas id="injuryTypeChart"></canvas>
+                </div>
+                
+                <div class="chart-card">
+                    <h3>Collision Types Distribution</h3>
+                    <canvas id="collisionTypeChart"></canvas>
+                </div>
+                
+                <div class="chart-card">
+                    <h3>Injuries by Year</h3>
+                    <canvas id="yearlyChart"></canvas>
+                </div>
+                
+                <div class="chart-card">
+                    <h3>Injuries by Month</h3>
+                    <canvas id="monthlyChart"></canvas>
+                </div>
+                
+                <div class="chart-card">
+                    <h3>Weekend vs Weekday Injuries</h3>
+                    <canvas id="weekendChart"></canvas>
+                </div>
+                
+                <div class="chart-card">
+                    <h3>Primary Factors</h3>
+                    <canvas id="factorChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // REPLACE THIS WITH YOUR GOOGLE SHEETS PUBLISHED CSV LINK
+        const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR873uS7-DaskUEBZaa0YlLJ2demrpfsPQ222L6DdsR_dyxlebrFNOBErHtd-bsoBF991E_mXJ5hcT7/pub?output=csv";
+        
+        let charts = [];
+        
+        async function loadData() {
+            try {
+                const response = await fetch(sheetUrl);
+                const csvText = await response.text();
+                
+                // Parse CSV using PapaParse
+                const result = Papa.parse(csvText, {
+                    header: true,
+                    skipEmptyLines: true
+                });
+                
+                if (result.errors.length > 0) {
+                    console.warn("Parsing errors:", result.errors);
+                }
+                
+                const data = result.data;
+                console.log("Loaded", data.length, "records");
+                
+                if (data.length === 0) {
+                    throw new Error("No data found in the spreadsheet");
+                }
+                
+                processData(data);
+                
+                document.getElementById("loading").style.display = "none";
+                document.getElementById("dashboard").style.display = "block";
+                
+            } catch (error) {
+                console.error("Error loading data:", error);
+                document.getElementById("loading").style.display = "none";
+                const errorDiv = document.getElementById("error");
+                errorDiv.style.display = "block";
+                errorDiv.innerHTML = `❌ Error loading data: ${error.message}<br><br>
+                    Make sure you have:<br>
+                    1. Published your Google Sheet to the web (File → Share → Publish to web)<br>
+                    2. Replaced 'YOUR_GOOGLE_SHEETS_CSV_URL_HERE' with the actual CSV link<br>
+                    3. The CSV link looks like: https://docs.google.com/spreadsheets/d/e/.../pub?output=csv`;
+            }
+        }
+        
+        function processData(data) {
+            // Initialize counters
+            const injuryTypes = {};
+            const collisionTypes = {};
+            const years = {};
+            const months = {};
+            const primaryFactors = {};
+            let weekendCount = 0;
+            let weekdayCount = 0;
+            
+            data.forEach(row => {
+                // Count Injury Types
+                let injury = row["Injury Type"];
+                if (injury && injury.trim()) {
+                    injuryTypes[injury] = (injuryTypes[injury] || 0) + 1;
+                }
+                
+                // Count Collision Types
+                let collision = row["Collision Type"];
+                if (collision && collision.trim()) {
+                    collisionTypes[collision] = (collisionTypes[collision] || 0) + 1;
+                }
+                
+                // Count by Year
+                let year = row["Year"];
+                if (year && year.trim()) {
+                    years[year] = (years[year] || 0) + 1;
+                }
+                
+                // Count by Month
+                let month = row["Month"];
+                if (month && month.trim()) {
+                    months[month] = (months[month] || 0) + 1;
+                }
+                
+                // Count Primary Factors
+                let factor = row["Primary Factor"];
+                if (factor && factor.trim()) {
+                    primaryFactors[factor] = (primaryFactors[factor] || 0) + 1;
+                }
+                
+                // Weekend vs Weekday
+                let weekend = row["Weekend?"];
+                if (weekend) {
+                    if (weekend.toString().toLowerCase() === "Weekend" || weekend === "Weekend" || weekend.toString().toLowerCase() === "true") {
+                        weekendCount++;
+                    } else if (weekend.toString().toLowerCase() === "Weekday" || weekend === "Weekday" || weekend.toString().toLowerCase() === "false") {
+                        weekdayCount++;
+                    }
+                }
+            });
+            
+            // Display key statistics
+            displayKeyStats(data.length, injuryTypes, collisionTypes, years);
+            
+            // Create charts
+            createBarChart("injuryTypeChart", injuryTypes, "Injury Type", "Number of Injuries");
+            createBarChart("collisionTypeChart", collisionTypes, "Collision Type", "Number of Incidents");
+            createBarChart("yearlyChart", years, "Year", "Number of Injuries");
+            createBarChart("monthlyChart", months, "Month", "Number of Injuries");
+            createBarChart("factorChart", primaryFactors, "Primary Factor", "Number of Incidents", true);
+            
+            // Weekend chart (pie)
+            createWeekendChart(weekendCount, weekdayCount);
+        }
+        
+        function displayKeyStats(totalRecords, injuryTypes, collisionTypes, years) {
+            const statsDiv = document.getElementById("keyStats");
+            
+            // Get top injury type
+            let topInjury = Object.entries(injuryTypes).sort((a,b) => b[1] - a[1])[0];
+            
+            // Get top collision type
+            let topCollision = Object.entries(collisionTypes).sort((a,b) => b[1] - a[1])[0];
+            
+            // Get year range
+            let yearKeys = Object.keys(years).sort();
+            let yearRange = yearKeys.length > 0 ? `${yearKeys[0]} - ${yearKeys[yearKeys.length-1]}` : "N/A";
+            
+            statsDiv.innerHTML = `
+                <div class="stat-item">
+                    <div class="stat-number">${totalRecords}</div>
+                    <div class="stat-label">Total Incidents</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">${topInjury ? topInjury[0] : "N/A"}</div>
+                    <div class="stat-label">Most Common Injury</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">${topCollision ? topCollision[0] : "N/A"}</div>
+                    <div class="stat-label">Most Common Collision</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">${yearRange}</div>
+                    <div class="stat-label">Data Period</div>
+                </div>
+            `;
+        }
+        
+        function createBarChart(canvasId, data, label, yLabel, isHorizontal = false) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            
+            // Sort and limit to top 10 if too many items
+            let sortedData = Object.entries(data).sort((a,b) => b[1] - a[1]);
+            if (sortedData.length > 12) {
+                sortedData = sortedData.slice(0, 12);
+            }
+            
+            const labels = sortedData.map(item => item[0]);
+            const values = sortedData.map(item => item[1]);
+            
+            // Destroy existing chart if exists
+            if (charts[canvasId]) {
+                charts[canvasId].destroy();
+            }
+            
+            charts[canvasId] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: values,
+                        backgroundColor: 'rgba(76, 175, 80, 0.6)',
+                        borderColor: 'rgba(76, 175, 80, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.raw} incidents`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: yLabel
+                            },
+                            ticks: {
+                                stepSize: 1
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function createWeekendChart(weekendCount, weekdayCount) {
+            const ctx = document.getElementById('weekendChart').getContext('2d');
+            
+            if (charts['weekendChart']) {
+                charts['weekendChart'].destroy();
+            }
+            
+            charts['weekendChart'] = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['Weekend', 'Weekday'],
+                    datasets: [{
+                        data: [weekendCount, weekdayCount],
+                        backgroundColor: ['#FF6384', '#36A2EB'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const total = weekendCount + weekdayCount;
+                                    const percentage = ((context.raw / total) * 100).toFixed(1);
+                                    return `${context.label}: ${context.raw} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Load data when page loads
+        loadData();
+    </script>
+</body>
+</html>

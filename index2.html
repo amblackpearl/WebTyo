@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Grafik Medali per Kategori (Multi-Sheet)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: system-ui, 'Segoe UI', 'Roboto', sans-serif;
+        }
+        body {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 32px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+            padding: 28px 32px;
+            animation: fadeIn 0.5s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        h1 {
+            font-size: 2rem;
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .badge {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: #1e293b;
+            padding: 4px 14px;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+        .sub {
+            color: #475569;
+            border-left: 4px solid #fbbf24;
+            padding-left: 16px;
+            margin: 8px 0 28px 0;
+            font-weight: 500;
+            background: #fefce8;
+            padding: 12px 20px;
+            border-radius: 16px;
+        }
+        .info-bar {
+            background: #f1f5f9;
+            padding: 12px 20px;
+            border-radius: 20px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .source-link {
+            font-family: monospace;
+            font-size: 0.7rem;
+            color: #3b82f6;
+            word-break: break-all;
+        }
+        .loading {
+            text-align: center;
+            padding: 60px;
+            background: #f8fafc;
+            border-radius: 32px;
+            margin: 20px 0;
+            font-weight: 500;
+        }
+        .spinner {
+            border: 3px solid #e2e8f0;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error-box {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 16px 24px;
+            border-radius: 20px;
+            margin: 20px 0;
+            display: none;
+            border-left: 5px solid #dc2626;
+        }
+        .success-box {
+            background: #dcfce7;
+            color: #166534;
+            padding: 12px 20px;
+            border-radius: 20px;
+            margin: 16px 0;
+            display: none;
+            border-left: 5px solid #22c55e;
+        }
+        .sheet-selector {
+            margin: 20px 0 24px 0;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 16px;
+        }
+        .sheet-label {
+            font-weight: 700;
+            background: #e0e7ff;
+            padding: 8px 18px;
+            border-radius: 40px;
+            font-size: 0.9rem;
+            color: #1e40af;
+        }
+        .sheet-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .sheet-btn {
+            background: #e2e8f0;
+            color: #1e293b;
+            padding: 10px 24px;
+            border-radius: 40px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .sheet-btn:hover {
+            background: #cbd5e1;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .sheet-btn.active {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            box-shadow: 0 4px 12px rgba(59,130,246,0.4);
+        }
+        .chart-container {
+            margin-top: 24px;
+            background: #ffffff;
+            border-radius: 24px;
+            padding: 20px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+            border: 1px solid #e2e8f0;
+        }
+        canvas {
+            max-height: 500px;
+            width: 100%;
+        }
+        .medal-legend {
+            display: flex;
+            gap: 32px;
+            justify-content: center;
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid #e2e8f0;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        .legend-color {
+            width: 28px;
+            height: 18px;
+            border-radius: 20px;
+        }
+        .stats-info {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 12px 20px;
+            margin-top: 20px;
+            font-size: 0.85rem;
+            color: #475569;
+            text-align: center;
+        }
+        footer {
+            text-align: center;
+            margin-top: 32px;
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+        @media (max-width: 680px) {
+            .container { padding: 18px; }
+            .sheet-buttons { max-height: 160px; overflow-y: auto; padding-bottom: 5px; }
+            h1 { font-size: 1.4rem; }
+            .sheet-btn { padding: 6px 16px; font-size: 0.8rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>
+        🏅 Dashboard Medali Olimpiade
+        <span class="badge">Multi-Sheet • Per Kategori</span>
+    </h1>
+    <div class="sub">
+        📊 Setiap <strong>sheet</strong> di spreadsheet = satu <strong>kategori</strong> (nama sheet menjadi nama kategori)<br>
+        Grafik batang menampilkan perolehan Emas 🥇, Perak 🥈, Perunggu 🥉 per tahun
+    </div>
+    
+    <div class="info-bar">
+        <span>🔗 <strong>Sumber Data:</strong></span>
+        <span class="source-link" id="sourceUrlDisplay">Memuat...</span>
+    </div>
+
+    <div id="loadingIndicator" class="loading">
+        <div class="spinner"></div>
+        <div>📡 Mengambil data dari Google Spreadsheet...</div>
+        <div style="font-size: 0.8rem; margin-top: 12px;">Membaca semua sheet & mengolah data medali</div>
+    </div>
+
+    <div id="errorMsg" class="error-box"></div>
+    <div id="successMsg" class="success-box"></div>
+
+    <div id="sheetPanel" style="display: none;">
+        <div class="sheet-selector">
+            <span class="sheet-label">🗂️ PILIH KATEGORI (NAMA SHEET):</span>
+            <div id="sheetButtons" class="sheet-buttons"></div>
+        </div>
+        <div class="chart-container">
+            <canvas id="medalChart" width="1000" height="450"></canvas>
+            <div class="medal-legend">
+                <div class="legend-item"><div class="legend-color" style="background: #fbbf24;"></div>🥇 Emas</div>
+                <div class="legend-item"><div class="legend-color" style="background: #9ca3af;"></div>🥈 Perak</div>
+                <div class="legend-item"><div class="legend-color" style="background: #d97706;"></div>🥉 Perunggu</div>
+            </div>
+            <div class="stats-info" id="statsInfo">
+                💡 Klik kategori di atas untuk melihat grafik medali per tahun
+            </div>
+        </div>
+    </div>
+    <footer>
+        ⚡ Data diambil langsung dari Google Spreadsheet | Kolom: Nama (opsional), Tahun, Emas, Perak, Perunggu
+    </footer>
+</div>
+
+<script>
+    // ========== KONFIGURASI LANGSUNG ==========
+    // Link spreadsheet yang diberikan (format publik)
+    const SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1SVG5tqs6TUktTN_7wUXDpUYGr0eXMPo63eyktQA2eWg/edit?gid=0#gid=0";
+    
+    // Tampilkan URL di info bar
+    document.getElementById('sourceUrlDisplay').innerText = SPREADSHEET_URL;
+    
+    // Global variables
+    let currentChart = null;
+    let allSheetsData = {};      // Key = nama sheet (kategori), Value = { years, emas, perak, perunggu }
+    let sheetNamesList = [];
+    
+    const loadingDiv = document.getElementById('loadingIndicator');
+    const errorDiv = document.getElementById('errorMsg');
+    const successDiv = document.getElementById('successMsg');
+    const sheetPanel = document.getElementById('sheetPanel');
+    const sheetButtonsDiv = document.getElementById('sheetButtons');
+    const canvas = document.getElementById('medalChart');
+    const statsInfo = document.getElementById('statsInfo');
+    
+    function showError(msg) {
+        errorDiv.style.display = 'block';
+        errorDiv.innerHTML = `<strong>❌ Error:</strong> ${msg}`;
+        loadingDiv.style.display = 'none';
+        sheetPanel.style.display = 'none';
+        successDiv.style.display = 'none';
+    }
+    
+    function showSuccess(msg) {
+        successDiv.style.display = 'block';
+        successDiv.innerHTML = `<strong>✅ ${msg}</strong>`;
+        setTimeout(() => {
+            successDiv.style.display = 'none';
+        }, 4000);
+    }
+    
+    function hideError() {
+        errorDiv.style.display = 'none';
+    }
+    
+    // Fungsi parsing data dari worksheet (array of array)
+    function parseSheetData(worksheetRows, sheetName) {
+        if (!worksheetRows || worksheetRows.length < 2) {
+            console.warn(`Sheet "${sheetName}" kosong atau tidak cukup baris`);
+            return null;
+        }
+        
+        // Cari baris header - mencari baris yang mengandung kata tahun/year dan emas/gold
+        let headerRowIndex = -1;
+        for (let i = 0; i < Math.min(worksheetRows.length, 15); i++) {
+            const row = worksheetRows[i];
+            if (!row || row.length === 0) continue;
+            const rowStr = row.join(' ').toLowerCase();
+            if ((rowStr.includes('tahun') || rowStr.includes('year')) && 
+                (rowStr.includes('emas') || rowStr.includes('gold') || rowStr.includes('perak') || rowStr.includes('silver'))) {
+                headerRowIndex = i;
+                break;
+            }
+        }
+        
+        if (headerRowIndex === -1) {
+            // Jika tidak ketemu, coba asumsikan baris pertama sebagai header
+            headerRowIndex = 0;
+            console.log(`Sheet "${sheetName}": Menggunakan baris pertama sebagai header`);
+        }
+        
+        const headers = worksheetRows[headerRowIndex].map(cell => (cell || '').toString().toLowerCase().trim());
+        
+        // Cari indeks kolom dengan berbagai kemungkinan nama
+        let colNama = headers.findIndex(h => h.includes('nama') || h === 'name' || h.includes('negara') || h.includes('kontingen') || h.includes('atlet'));
+        let colTahun = headers.findIndex(h => h.includes('tahun') || h === 'year');
+        let colEmas = headers.findIndex(h => h.includes('emas') || h === 'gold');
+        let colPerak = headers.findIndex(h => h.includes('perak') || h === 'silver');
+        let colPerunggu = headers.findIndex(h => h.includes('perunggu') || h === 'bronze');
+        
+        // Fallback berdasarkan posisi umum jika tidak ketemu
+        if (colTahun === -1 && headers.length > 1) colTahun = 1;
+        if (colEmas === -1 && headers.length > 2) colEmas = 2;
+        if (colPerak === -1 && headers.length > 3) colPerak = 3;
+        if (colPerunggu === -1 && headers.length > 4) colPerunggu = 4;
+        if (colNama === -1) colNama = 0;
+        
+        console.log(`Sheet "${sheetName}" - Kolom: Tahun=${colTahun}, Emas=${colEmas}, Perak=${colPerak}, Perunggu=${colPerunggu}`);
+        
+        const dataRows = worksheetRows.slice(headerRowIndex + 1);
+        const tahunMap = new Map(); // tahun -> { emas, perak, perunggu }
+        
+        for (const row of dataRows) {
+            if (!row || row.length === 0) continue;
+            const tahunRaw = row[colTahun];
+            const tahun = parseInt(tahunRaw, 10);
+            if (isNaN(tahun)) continue;
+            
+            const emas = parseInt(row[colEmas]) || 0;
+            const perak = parseInt(row[colPerak]) || 0;
+            const perunggu = parseInt(row[colPerunggu]) || 0;
+            
+            if (!tahunMap.has(tahun)) {
+                tahunMap.set(tahun, { emas: 0, perak: 0, perunggu: 0 });
+            }
+            const agg = tahunMap.get(tahun);
+            agg.emas += emas;
+            agg.perak += perak;
+            agg.perunggu += perunggu;
+        }
+        
+        if (tahunMap.size === 0) {
+            console.warn(`Sheet "${sheetName}" tidak memiliki data numerik tahun yang valid`);
+            return null;
+        }
+        
+        const sortedYears = Array.from(tahunMap.keys()).sort((a, b) => a - b);
+        const emasArr = sortedYears.map(y => tahunMap.get(y).emas);
+        const perakArr = sortedYears.map(y => tahunMap.get(y).perak);
+        const perungguArr = sortedYears.map(y => tahunMap.get(y).perunggu);
+        
+        return {
+            sheetName: sheetName,
+            years: sortedYears,
+            emas: emasArr,
+            perak: perakArr,
+            perunggu: perungguArr
+        };
+    }
+    
+    // Load SheetJS library
+    function loadSheetJSLib() {
+        return new Promise((resolve, reject) => {
+            if (window.XLSX) {
+                resolve(window.XLSX);
+                return;
+            }
+            const script = document.createElement('script');
+            script.src = 'https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js';
+            script.onload = () => resolve(window.XLSX);
+            script.onerror = () => reject(new Error('Gagal memuat library SheetJS'));
+            document.head.appendChild(script);
+        });
+    }
+    
+    // Konversi URL publik ke XLSX untuk mendapatkan semua sheet
+    function getXlsxUrlFromPublicCsv(csvUrl) {
+        const match = csvUrl.match(/\/e\/([a-zA-Z0-9_-]+)/);
+        if (match) {
+            const docId = match[1];
+            return `https://docs.google.com/spreadsheets/d/e/${docId}/export?format=xlsx`;
+        }
+        return csvUrl.replace('pub?output=csv', 'export?format=xlsx');
+    }
+    
+    // Memuat spreadsheet dari URL XLSX
+    async function loadSpreadsheet() {
+        hideError();
+        loadingDiv.style.display = 'block';
+        sheetPanel.style.display = 'none';
+        
+        try {
+            const XLSX = await loadSheetJSLib();
+            const xlsxUrl = getXlsxUrlFromPublicCsv(SPREADSHEET_URL);
+            console.log("Loading XLSX from:", xlsxUrl);
+            
+            const response = await fetch(xlsxUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: Gagal mengunduh file. Pastikan spreadsheet dapat diakses publik.`);
+            }
+            
+            const arrayBuffer = await response.arrayBuffer();
+            const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: false, defval: "" });
+            
+            const sheets = workbook.SheetNames;
+            if (!sheets || sheets.length === 0) {
+                throw new Error("Tidak ada sheet dalam spreadsheet.");
+            }
+            
+            console.log(`Ditemukan ${sheets.length} sheet:`, sheets);
+            
+            const parsedData = {};
+            let successCount = 0;
+            
+            for (const sheetName of sheets) {
+                const worksheet = workbook.Sheets[sheetName];
+                const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+                if (rows && rows.length > 1) {
+                    const parsed = parseSheetData(rows, sheetName);
+                    if (parsed && parsed.years && parsed.years.length > 0) {
+                        parsedData[sheetName] = parsed;
+                        successCount++;
+                        console.log(`✅ Sheet "${sheetName}" berhasil diproses, tahun: ${parsed.years.join(', ')}`);
+                    } else {
+                        console.warn(`⚠️ Sheet "${sheetName}" tidak memiliki data medali yang valid`);
+                    }
+                } else {
+                    console.warn(`⚠️ Sheet "${sheetName}" kosong`);
+                }
+            }
+            
+            if (successCount === 0) {
+                throw new Error("Tidak ada sheet yang berisi data medali yang valid. Pastikan setiap sheet memiliki kolom: Tahun, Emas, Perak, Perunggu.");
+            }
+            
+            allSheetsData = parsedData;
+            sheetNamesList = Object.keys(parsedData);
+            
+            // Update UI: tampilkan semua kategori (nama sheet)
+            renderSheetButtons();
+            if (sheetNamesList.length > 0) {
+                renderChart(sheetNamesList[0]);
+                sheetPanel.style.display = 'block';
+                showSuccess(`Berhasil memuat ${sheetNamesList.length} kategori (sheet): ${sheetNamesList.join(', ')}`);
+            }
+            
+            loadingDiv.style.display = 'none';
+            
+        } catch (err) {
+            console.error(err);
+            loadingDiv.style.display = 'none';
+            showError(err.message + " Periksa kembali link spreadsheet dan pastikan akses publik (File → Bagikan → 'Siapa saja dengan tautan dapat melihat').");
+        }
+    }
+    
+    function renderSheetButtons() {
+        sheetButtonsDiv.innerHTML = '';
+        sheetNamesList.forEach((sheetName, idx) => {
+            const btn = document.createElement('button');
+            // TAMPILKAN NAMA SHEET ASLI sebagai teks kategori
+            btn.innerText = sheetName;
+            btn.classList.add('sheet-btn');
+            if (idx === 0) btn.classList.add('active');
+            btn.title = `Klik untuk melihat grafik medali ${sheetName}`;
+            btn.addEventListener('click', () => {
+                // Update active class pada semua tombol
+                document.querySelectorAll('.sheet-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                renderChart(sheetName);
+                // Update info stats
+                const data = allSheetsData[sheetName];
+                if (data) {
+                    statsInfo.innerHTML = `📊 Menampilkan data <strong>${sheetName}</strong> | Tahun: ${data.years.join(' → ')} | Total Medali: ${data.emas.reduce((a,b)=>a+b,0) + data.perak.reduce((a,b)=>a+b,0) + data.perunggu.reduce((a,b)=>a+b,0)}`;
+                }
+            });
+            sheetButtonsDiv.appendChild(btn);
+        });
+        
+        // Update stats untuk sheet pertama
+        if (sheetNamesList.length > 0) {
+            const firstData = allSheetsData[sheetNamesList[0]];
+            if (firstData) {
+                statsInfo.innerHTML = `📊 Menampilkan data <strong>${sheetNamesList[0]}</strong> | Tahun: ${firstData.years.join(' → ')} | Total Medali: ${firstData.emas.reduce((a,b)=>a+b,0) + firstData.perak.reduce((a,b)=>a+b,0) + firstData.perunggu.reduce((a,b)=>a+b,0)}`;
+            }
+        }
+    }
+    
+    function renderChart(sheetName) {
+        const data = allSheetsData[sheetName];
+        if (!data) return;
+        
+        const ctx = canvas.getContext('2d');
+        if (currentChart) {
+            currentChart.destroy();
+        }
+        
+        currentChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.years.map(y => y.toString()),
+                datasets: [
+                    {
+                        label: '🥇 Emas',
+                        data: data.emas,
+                        backgroundColor: 'rgba(251, 191, 36, 0.85)',
+                        borderColor: '#f59e0b',
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        barPercentage: 0.7,
+                        categoryPercentage: 0.8
+                    },
+                    {
+                        label: '🥈 Perak',
+                        data: data.perak,
+                        backgroundColor: 'rgba(156, 163, 175, 0.85)',
+                        borderColor: '#6b7280',
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        barPercentage: 0.7,
+                        categoryPercentage: 0.8
+                    },
+                    {
+                        label: '🥉 Perunggu',
+                        data: data.perunggu,
+                        backgroundColor: 'rgba(217, 119, 6, 0.8)',
+                        borderColor: '#b45309',
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        barPercentage: 0.7,
+                        categoryPercentage: 0.8
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { font: { size: 13, weight: 'bold' }, usePointStyle: true, boxWidth: 12 }
+                    },
+                    title: {
+                        display: true,
+                        text: `🏅 Perolehan Medali - ${sheetName}`,
+                        font: { size: 18, weight: 'bold' },
+                        padding: { bottom: 20, top: 10 },
+                        color: '#1e293b'
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: 'rgba(0,0,0,0.8)',
+                        titleFont: { size: 13, weight: 'bold' },
+                        bodyFont: { size: 12 },
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.dataset.label}: ${context.raw} medali`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Jumlah Medali', font: { size: 12, weight: 'bold' } },
+                        grid: { color: '#e2e8f0', drawBorder: true },
+                        ticks: { stepSize: 1, precision: 0 }
+                    },
+                    x: {
+                        title: { display: true, text: 'Tahun', font: { size: 12, weight: 'bold' } },
+                        grid: { display: false }
+                    }
+                },
+                animation: {
+                    duration: 700,
+                    easing: 'easeOutQuart'
+                }
+            }
+        });
+    }
+    
+    // Jalankan otomatis saat halaman dimuat
+    window.addEventListener('DOMContentLoaded', () => {
+        loadSpreadsheet();
+    });
+</script>
+</body>
+</html>

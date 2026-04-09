@@ -19,4 +19,5 @@ Open any of the HTML files in a browser to view the chart example. The files sho
 ## Notes
 
 - The source data in these examples is expected to come from a Google Sheets spreadsheet.
+- The chart rendering script is located in `script/script.js`.
 - You may need to update the spreadsheet URL or data access settings if you want to adapt the examples to your own sheet.
